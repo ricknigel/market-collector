@@ -16,6 +16,6 @@ for exchange in ${target_tickers[@]}; do
   for period in ${period_array[@]}; do
     table_name="${exchange}_${period}"
     echo "create ${table_name} table"
-    bq mk -t "${dataset_name}.${table_name}" ../schema/CRYPTO_MARKET_PRICE_schema.json
+    bq mk -t "${dataset_name}.${table_name}" ../schema/MARKET_PRICE_schema.json
   done
 done

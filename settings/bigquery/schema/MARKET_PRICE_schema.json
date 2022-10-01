@@ -36,7 +36,7 @@
     "mode": "Required"
   },
   {
-    "description": "取引量(BTC)",
+    "description": "取引量",
     "name": "VOLUME",
     "type": "FLOAT",
     "mode": "Required"
