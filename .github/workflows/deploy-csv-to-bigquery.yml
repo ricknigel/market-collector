@@ -1,10 +1,10 @@
-name: Deploy function 'market-collector' To Google Cloud Functions
+name: Deploy function 'csv-to-bigquery' To Google Cloud Functions
 
 on:
   push:
     paths:
-      - 'src/functions/market-collector'
-      - '.github/workflows/deploy-market-collector.yml'
+      - 'src/functions/csv-to-bigquery'
+      - '.github/workflows/deploy-csv-to-bigquery.yml'
 
 jobs:
   deploy-function:
@@ -30,19 +30,16 @@ jobs:
       - id: deploy-function
         uses: google-github-actions/deploy-cloud-functions@v0
         with:
-          name: market-collector
+          name: csv-to-bigquery
           runtime: python39
           entry_point: handler
           memory_mb: 512
           region: ${{ secrets.GCP_REGION }}
           env_vars: >-
             GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }},
-            MARKET_DATA_BUCKET=${{ secrets.MARKET_DATA_BUCKET }},
-            BIGQUERY_DATASET=${{ secrets.BIGQUERY_DATASET }},
-            BIGQUERY_UNIXTIME_TABLE=${{ secrets.BIGQUERY_UNIXTIME_TABLE }},
             ERROR_REPORT_TOPIC=${{ secrets.ERROR_REPORT_TOPIC }},
-          source_dir: src/functions/market-collector
+          source_dir: src/functions/csv-to-bigquery
           timeout: 300
-          event_trigger_type: google.pubsub.topic.publish
-          event_trigger_resource: projects/${{ secrets.GCP_PROJECT_ID }}/topics/${{ secrets.COLLECT_SCHEDULER_TOPIC }}
-          event_trigger_service: pubsub.googleapis.com
+          event_trigger_type: google.storage.object.finalize
+          event_trigger_resource: projects/${{ secrets.GCP_PROJECT_ID }}/buckets/${{ secrets.MARKET_DATA_BUCKET }}
+          event_trigger_service: storage.googleapis.com

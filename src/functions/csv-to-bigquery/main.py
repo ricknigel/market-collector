@@ -4,7 +4,6 @@ from google.cloud import bigquery
 from google.cloud.pubsub import PublisherClient
 
 project_id = os.getenv('GCP_PROJECT_ID')
-dataset = os.getenv('BIGQUERY_DATASET')
 
 
 def handler(data, context):
@@ -16,11 +15,13 @@ def handler(data, context):
 
 
 def csv_to_bigquery(data):
-    bucket = data['bucket']
+    # csvファイルのアップロード先バケット名
+    bucket: str = data['bucket']
+    # アップロードされたcsvファイルのパス
     file_path: str = data["name"]
     gcs_uri = f'gs://{bucket}/{file_path}'
 
-    table_name = get_table_name(file_path)
+    dataset, table_name = get_table_name(file_path)
     table_id = f'{dataset}.{table_name}'
 
     client = bigquery.Client(project_id)
@@ -38,14 +39,15 @@ def csv_to_bigquery(data):
 
 
 def get_table_name(file_path: str):
-    # file_path: <ticker>/<period>.csv
+    # file_path: <dataset>/<ticker>/YYYYMMDD_HHh/<period>.csv
     # table_name: <ticker>_<period>
 
     split_slash = file_path.split('/')
-    ticker = split_slash[0]
-    period = split_slash[1].split('.')[0]
+    dataset = split_slash[0]
+    ticker = split_slash[1]
+    period = split_slash[-1].split('.')[0]
 
-    return f'{ticker}_{period}'
+    return dataset, f'{ticker}_{period}'
 
 
 # エラー通知用topicへpublishする
