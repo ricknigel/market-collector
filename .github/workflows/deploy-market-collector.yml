@@ -1,0 +1,47 @@
+name: Deploy function 'market-collector' To Google Cloud Functions
+
+on:
+  push:
+    paths:
+      - 'src/functions/market-collector'
+      - '.github/workflows/deploy-market-collector.yml'
+
+jobs:
+  deploy-function:
+    name: Deploy To Google Cloud Functions
+    runs-on: ubuntu-20.04
+    timeout-minutes: 300
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v3
+      
+      - id: auth-gcloud
+        uses: google-github-actions/auth@v0
+        with:
+          workload_identity_provider: ${{ secrets.GCLOUD_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCLOUD_SERVICE_ACCOUNT }}
+          create_credentials_file: 'true'
+          cleanup_credentials: 'true'
+      
+      - id: deploy-function
+        uses: google-github-actions/deploy-cloud-functions@v0
+        with:
+          name: 'market-collector'
+          runtime: 'python39'
+          entry_point: 'handler'
+          memory_mb: 512
+          region: ${{ secrets.GCP_REGION }}
+          env_vars: >-
+            GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }},
+            MARKET_DATA_BUCKET=${{ secrets.MARKET_DATA_BUCKET }},
+            BIGQUERY_DATASET=${{ secrets.BIGQUERY_DATASET }},
+            BIGQUERY_UNIXTIME_TABLE=${{ secrets.BIGQUERY_UNIXTIME_TABLE }},
+            ERROR_REPORT_TOPIC=${{ secrets.ERROR_REPORT_TOPIC }},
+          source_dir: 'src/functions/market-collector'
+          timeout: 300
+          event_trigger_type: 'google.pubsub.topic.publish'
+          event_trigger_resource: 'projects/${{ secrets.GCP_PROJECT_ID }}/topics/${{ secrets.COLLECT_SCHEDULER_TOPIC }}'

@@ -1,10 +1,11 @@
-from io import BytesIO
 import os
-from pandas.core.frame import DataFrame
+import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
+import pandas as pd
 import requests
 from google.cloud import bigquery, storage
-import pandas as pd
-from shared_module import project_id, dataset
+from google.cloud.pubsub import PublisherClient
 
 exchanges = [
     {'exchange': 'coinbase-pro', 'ticker': 'BTCUSD'},
@@ -37,17 +38,46 @@ columns = [
     'QUOTE_VOLUME'
 ]
 
+# GCPのプロジェクトID
+project_id = os.getenv('GCP_PROJECT_ID')
+# BigQueryのデータセット名
+dataset = os.getenv('BIGQUERY_DATASET')
+# 金融データ(csv)のアップロード先バケット名
+bucket_name = os.getenv('MARKET_DATA_BUCKET')
+# 最新unixtime管理テーブル名
+recently_unixtime_table = os.getenv('BIGQUERY_UNIXTIME_TABLE')
+# cryptowatchAPIのurl（暗号資産データ取得先API）
 crypto_watch_url = "https://api.cryptowat.ch/markets/{exchange}/{ticker}/ohlc"
-recently_unixtime_table = 'RECENTLY_UNIXTIME'
-bucket_name = os.environ['GCS_BUCKET']
 
 
-def crypto_market_collector_main():
+def handler(event, context):
+    """
+    エンドポイント
+    """
+    try:
+        market_collector()
+    except Exception as e:
+        publish_error_report(str(e))
+        print(e)
 
+
+def market_collector():
+    """
+    金融データを収集する
+    """
+
+    # 暗号資産データを収集する
+    collect_coin_market()
+
+
+def collect_coin_market():
     bigquery_client = bigquery.Client(project_id)
 
-    # 最新unixTime取得
+    # 最新unixTimeを取得する
     df_unixtime = load_recently_unixtime(bigquery_client)
+
+    now = datetime.now(ZoneInfo("Asia/Tokyo"))
+    execTime = now.strftime("%Y%m%d_%Hh")
 
     for exchange in exchanges:
         for period in periods:
@@ -87,6 +117,7 @@ def crypto_market_collector_main():
             # api取得分のdfをcsv形式でgcsへアップロードする
             upload_df_to_gcs(
                 exchange['ticker'],
+                execTime,
                 period['name'],
                 df_api
             )
@@ -111,13 +142,8 @@ def crypto_market_collector_main():
 
 def load_recently_unixtime(client: bigquery.Client):
 
-    query = f"""
-        SELECT
-            TABLE_NAME,
-            UNIX_TIME
-        FROM
-            `{dataset}.{recently_unixtime_table}`;
-    """
+    table_name = f"{project_id}.{dataset}.{recently_unixtime_table}"
+    query = f"SELECT TABLE_NAME, UNIX_TIME FROM `{table_name}`;"
 
     unixtime_df = client.query(query).to_dataframe()
 
@@ -125,6 +151,9 @@ def load_recently_unixtime(client: bigquery.Client):
 
 
 def request_crypto_watch_api(exchange, ticker, period, unixtime):
+    """
+    暗号資産データを取得するためにcryptowatchAPIへリクエストする
+    """
     endpoint = crypto_watch_url.format(
         exchange=exchange,
         ticker=ticker
@@ -138,31 +167,28 @@ def request_crypto_watch_api(exchange, ticker, period, unixtime):
     return response['result'][period]
 
 
-def upload_df_to_gcs(ticker, period, df_api):
+def upload_df_to_gcs(ticker, execTime, period, df_api):
+    """
+    APIデータ（データフレーム）をcsv形式でGCSへアップロードする
+    """
     client = storage.Client(project_id)
     bucket = client.get_bucket(bucket_name)
 
-    gcs_path = f'{ticker}/{period}.csv'
+    gcs_path = f'{dataset}/{ticker}/{execTime}/{period}.csv'
+
     blob = bucket.blob(gcs_path)
-
-    if blob.exists():
-        # 特定pathにファイルがある場合、元ファイルのdfにapi取得分のdfを結合する
-        df_master: DataFrame = pd.read_csv(BytesIO(blob.download_as_string()))
-        df_api = df_master.append(df_api, ignore_index=True, sort=False)
-
-    # 特定pathにファイルがない場合、api取得分のdfを直接gcsへアップロードする
-
-    # アップロード用のblobを取得
-    upload_blob = bucket.blob(gcs_path)
-    upload_blob.upload_from_string(
+    blob.upload_from_string(
         df_api.to_csv(index=False, header=True, sep=','),
         content_type='text/csv'
     )
 
 
 def update_recently_unixtime(client: bigquery.Client, df_unixtime):
-
+    """
+    最新UnixTime管理テーブルのunixtimeを更新する
+    """
     table_id = f'{project_id}.{dataset}.{recently_unixtime_table}'
+
     # unixtimeデータフレームをunixtime管理テーブルへinsert
     client.insert_rows_from_dataframe(client.get_table(table_id), df_unixtime)
 
@@ -174,10 +200,7 @@ def update_recently_unixtime(client: bigquery.Client, df_unixtime):
             SELECT
                 *,
                 ROW_NUMBER() OVER (
-                    PARTITION BY
-                        TABLE_NAME
-                    ORDER BY
-                        UNIX_TIME DESC
+                    PARTITION BY TABLE_NAME ORDER BY UNIX_TIME DESC
                 ) as rowNumber
             FROM
                 {table_id}
@@ -191,3 +214,25 @@ def update_recently_unixtime(client: bigquery.Client, df_unixtime):
     job_config.write_disposition = 'WRITE_TRUNCATE'
     job = client.query(duplicate_query, job_config=job_config)
     job.result()
+
+
+def publish_error_report(error: str):
+    """
+    エラー通知用topicへpublishする
+    """
+    publisher = PublisherClient()
+    function_name = os.getenv('FUNCTION_TARGET')
+    error_report_topic = os.getenv('ERROR_REPORT_TOPIC')
+    topic_name = f'projects/{project_id}/topics/{error_report_topic}'
+
+    try:
+        publisher.publish(
+            topic_name,
+            data=error.encode('utf-8'),
+            projectId=project_id,
+            functionName=function_name,
+            eventTime=str(int(time.time()))
+        )
+    except Exception as e:
+        # エラー時はリトライしない
+        print(e)
