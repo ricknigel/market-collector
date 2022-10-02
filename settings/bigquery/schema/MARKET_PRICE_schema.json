@@ -3,48 +3,48 @@
     "description": "UnixTime(キー)",
     "name": "UNIX_TIME",
     "type": "INTEGER",
-    "mode": "Required"
+    "mode": "Nullable"
   },
   {
     "description": "日時",
     "name": "CLOSE_TIME",
     "type": "TIMESTAMP",
-    "mode": "Required"
+    "mode": "Nullable"
   },
   {
     "description": "始値",
     "name": "OPEN_PRICE",
     "type": "FLOAT",
-    "mode": "Required"
+    "mode": "Nullable"
   },
   {
     "description": "高値",
     "name": "HIGH_PRICE",
     "type": "FLOAT",
-    "mode": "Required"
+    "mode": "Nullable"
   },
   {
     "description": "低値",
     "name": "LOW_PRICE",
     "type": "FLOAT",
-    "mode": "Required"
+    "mode": "Nullable"
   },
   {
     "description": "終値",
     "name": "CLOSE_PRICE",
     "type": "FLOAT",
-    "mode": "Required"
+    "mode": "Nullable"
   },
   {
     "description": "取引量",
     "name": "VOLUME",
     "type": "FLOAT",
-    "mode": "Required"
+    "mode": "Nullable"
   },
   {
     "description": "取引量(通貨ペア)",
     "name": "QUOTE_VOLUME",
     "type": "FLOAT",
-    "mode": "Required"
+    "mode": "Nullable"
   }
 ]

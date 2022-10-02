@@ -2,7 +2,7 @@
 
 echo "start craete DataSet in BigQuery"
 
-dataset_name="MARKET_DATA"
+dataset_name=""
 
 bq --location=asia-northeast1 mk -d ${dataset_name}
 

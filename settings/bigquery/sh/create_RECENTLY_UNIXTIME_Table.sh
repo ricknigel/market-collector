@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-dataset_name="MARKET_DATA"
+dataset_name=""
 table_name="RECENTLY_UNIXTIME"
 
 echo "start create Tables in BigQuery"

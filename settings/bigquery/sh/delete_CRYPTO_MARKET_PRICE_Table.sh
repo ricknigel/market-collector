@@ -1,4 +1,4 @@
-dataset_name="MARKET_DATA"
+dataset_name=""
 
 target_tickers=(BTCUSD ETHBTC)
 

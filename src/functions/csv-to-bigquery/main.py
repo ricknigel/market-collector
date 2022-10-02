@@ -11,7 +11,7 @@ def handler(data, context):
         csv_to_bigquery(data)
     except Exception as e:
         publish_error_report(str(e))
-        print(e)
+        raise e
 
 
 def csv_to_bigquery(data):
@@ -53,18 +53,13 @@ def get_table_name(file_path: str):
 # エラー通知用topicへpublishする
 def publish_error_report(error: str):
     publisher = PublisherClient()
-    function_name = os.getenv('FUNCTION_TARGET')
     error_report_topic = os.getenv('ERROR_REPORT_TOPIC')
     topic_name = f'projects/{project_id}/topics/{error_report_topic}'
 
-    try:
-        publisher.publish(
-            topic_name,
-            data=error.encode('utf-8'),
-            projectId=project_id,
-            functionName=function_name,
-            eventTime=str(int(time.time()))
-        )
-    except Exception as e:
-        # エラー時はリトライしない
-        print(e)
+    publisher.publish(
+        topic_name,
+        data=error.encode('utf-8'),
+        projectId=project_id,
+        functionName="csv-to-bigquery",
+        eventTime=str(int(time.time()))
+    )

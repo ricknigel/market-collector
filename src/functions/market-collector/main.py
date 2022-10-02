@@ -58,7 +58,7 @@ def handler(event, context):
         market_collector()
     except Exception as e:
         publish_error_report(str(e))
-        print(e)
+        raise e
 
 
 def market_collector():
@@ -127,9 +127,11 @@ def collect_coin_market():
 
             if df_target_unixtime.empty:
                 # unixtimeデータフレームが空の場合、追加する
-                df_unixtime = df_unixtime.append(
+                df_unixtime = pd.concat(
+                    df_unixtime,
                     {'TABLE_NAME': table_name, 'UNIX_TIME': max_unixtime},
-                    ignore_index=True)
+                    ignore_index=True
+                )
             else:
                 # unixtimeデータフレームが空ではない場合、該当するunixtimeを更新する
                 df_unixtime.loc[
@@ -221,18 +223,13 @@ def publish_error_report(error: str):
     エラー通知用topicへpublishする
     """
     publisher = PublisherClient()
-    function_name = os.getenv('FUNCTION_TARGET')
     error_report_topic = os.getenv('ERROR_REPORT_TOPIC')
     topic_name = f'projects/{project_id}/topics/{error_report_topic}'
 
-    try:
-        publisher.publish(
-            topic_name,
-            data=error.encode('utf-8'),
-            projectId=project_id,
-            functionName=function_name,
-            eventTime=str(int(time.time()))
-        )
-    except Exception as e:
-        # エラー時はリトライしない
-        print(e)
+    publisher.publish(
+        topic_name,
+        data=error.encode('utf-8'),
+        projectId=project_id,
+        functionName="market-collector",
+        eventTime=str(int(time.time()))
+    )

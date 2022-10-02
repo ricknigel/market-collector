@@ -3,12 +3,12 @@
     "description": "テーブル",
     "name": "TABLE_NAME",
     "type": "STRING",
-    "mode": "Required"
+    "mode": "Nullable"
   },
   {
     "description": "UnixTime",
     "name": "UNIX_TIME",
     "type": "INTEGER",
-    "mode": "Required"
+    "mode": "Nullable"
   }
 ]
