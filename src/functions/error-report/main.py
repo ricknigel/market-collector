@@ -41,9 +41,9 @@ def report_error(event: PubSubMessage):
     error = base64.b64decode(event['data']).decode('utf-8')
     projectId = event['attributes']['projectId']
     functionName = event['attributes']['functionName']
-    unixtime = event['attributes']['eventTime']
+    unixtime = int(event['attributes']['eventTime'])
 
-    eventTime = datetime.fromtimestamp(unixtime)
+    eventTime = datetime.fromtimestamp(unixtime, ZoneInfo("Asia/Tokyo"))
     print(f"functionName: {functionName}, Time: {eventTime}, error: {error}")
 
     # slackへ通知
