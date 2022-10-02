@@ -3,7 +3,7 @@ name: Deploy function 'csv-to-bigquery' To Google Cloud Functions
 on:
   push:
     paths:
-      - 'src/functions/csv-to-bigquery'
+      - 'src/functions/csv-to-bigquery/**'
       - '.github/workflows/deploy-csv-to-bigquery.yml'
 
 jobs:

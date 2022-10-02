@@ -3,7 +3,7 @@ name: Deploy function 'market-collector' To Google Cloud Functions
 on:
   push:
     paths:
-      - 'src/functions/market-collector'
+      - 'src/functions/market-collector/**'
       - '.github/workflows/deploy-market-collector.yml'
 
 jobs:
