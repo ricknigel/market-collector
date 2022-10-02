@@ -117,7 +117,7 @@ def collect_coin_market():
             df_api['CLOSE_TIME'] = pd.to_datetime(
                 df_api['UNIX_TIME'],
                 unit='s',
-                format='%Y-%m-%d %H:%M:%S'
+                utc=True
             )
 
             # api取得分のdfをcsv形式でgcsへアップロードする
