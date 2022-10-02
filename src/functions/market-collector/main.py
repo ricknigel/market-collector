@@ -28,8 +28,7 @@ periods = [
     {'name': "1W", 'time': "604800"}
 ]
 
-columns = [
-    'UNIX_TIME',
+float_columns = [
     'OPEN_PRICE',
     'HIGH_PRICE',
     'LOW_PRICE',
@@ -37,6 +36,8 @@ columns = [
     'VOLUME',
     'QUOTE_VOLUME'
 ]
+
+columns = ['UNIX_TIME'] + float_columns
 
 # GCPのプロジェクトID
 project_id = os.getenv('GCP_PROJECT_ID')
@@ -109,9 +110,14 @@ def collect_coin_market():
 
             # api取得分のデータ(list in list)をDataFrameに変換
             df_api = pd.DataFrame(response_data, columns=columns)
+
+            # int → floatへ変換(cryptowatchから小数点無しで来る場合がある)
+            df_api[float_columns] = df_api[float_columns].astype('float')
+            # unixtime → datetimeへ変換
             df_api['CLOSE_TIME'] = pd.to_datetime(
                 df_api['UNIX_TIME'],
-                unit='s'
+                unit='s',
+                format='%Y-%m-%d %H:%M:%S'
             )
 
             # api取得分のdfをcsv形式でgcsへアップロードする

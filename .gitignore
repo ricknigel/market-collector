@@ -1,5 +1,6 @@
 __pycache__
 .vscode
-.env.yml
-.env-test.yml
 .env*
+
+# python 仮想環境
+.venv
