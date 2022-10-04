@@ -1,0 +1,10 @@
+google-cloud-pubsub
+# google-cloud-bigqueryバージョン3系は以下バグが混入しているため、修正されるまで2系を使用する
+# https://github.com/googleapis/python-bigquery/issues/1348
+google-cloud-bigquery==2.34.4
+google-cloud-storage
+pandas
+
+# google-cloud-bigquery依存
+pyarrow
+db-dtypes

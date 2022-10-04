@@ -18,7 +18,7 @@ class PubSubMessage(TypedDict):
 
 
 # slackのwebhookURL
-webhook_url = os.getenv('SLACK_WEBHOOK_URL')
+webhook_url = os.getenv("SLACK_WEBHOOK_URL")
 
 
 def handler(event: PubSubMessage, context):
@@ -38,10 +38,10 @@ def report_error(event: PubSubMessage):
     """
     エラー内容をslackで通知します
     """
-    error = base64.b64decode(event['data']).decode('utf-8')
-    projectId = event['attributes']['projectId']
-    functionName = event['attributes']['functionName']
-    unixtime = int(event['attributes']['eventTime'])
+    error = base64.b64decode(event["data"]).decode("utf-8")
+    projectId = event["attributes"]["projectId"]
+    functionName = event["attributes"]["functionName"]
+    unixtime = int(event["attributes"]["eventTime"])
 
     eventTime = datetime.fromtimestamp(unixtime, ZoneInfo("Asia/Tokyo"))
     print(f"functionName: {functionName}, Time: {eventTime}, error: {error}")
@@ -94,5 +94,5 @@ def post_slack_message(
 
     if response.status_code != 200:
         error_msg = f"Slack Webhook Error \
-            [Http Status: {response.status_code}], [Result {response.json()}]"
+            [HTTP STATUS: {response.status_code}], [RESULT: {response.json()}]"
         raise Exception(error_msg)
