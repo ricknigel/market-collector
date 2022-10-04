@@ -115,9 +115,10 @@ def handler(request):
 
             if df_target_unixtime.empty:
                 # unixtimeデータフレームが空の場合、追加する
-                df_unixtime = pd.concat(
-                    df_unixtime,
-                    {"TABLE_NAME": table_name, "UNIX_TIME": max_unixtime},
+                df_unixtime = pd.concat([
+                        df_unixtime,
+                        {"TABLE_NAME": table_name, "UNIX_TIME": max_unixtime}
+                    ],
                     ignore_index=True
                 )
             else:
@@ -128,6 +129,8 @@ def handler(request):
 
     # unixtime重複削除
     update_recently_unixtime(bigquery_client, df_unixtime)
+
+    return "ok"
 
 
 def load_recently_unixtime(client: BqClient):
