@@ -94,5 +94,5 @@ def post_slack_message(
 
     if response.status_code != 200:
         error_msg = f"Slack Webhook Error \
-            [HTTP STATUS: {response.status_code}], [RESULT: {response.json()}]"
+            [HTTP STATUS: {response.status_code}], [RESULT: {response.text}]"
         raise Exception(error_msg)

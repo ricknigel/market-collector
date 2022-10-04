@@ -39,8 +39,8 @@ def request_crypto_collector():
     response = request_google_functions(crypto_collector_endpoint)
 
     if response.status_code != 200:
-        error_msg = f"crypto-collector Erro \
-            [HTTP STATUS: {response.status_code}], [RESULT: {response.json()}]"
+        error_msg = f"crypto-collector Error \
+            [HTTP STATUS: {response.status_code}], [RESULT: {response.text}]"
         raise Exception(error_msg)
 
 

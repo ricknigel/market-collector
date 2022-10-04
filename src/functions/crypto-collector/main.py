@@ -68,7 +68,7 @@ def handler(request):
             table_name = f"{exchange['ticker']}_{period['name']}'"
 
             df_target_unixtime = df_unixtime.query(
-                f"TABLE_NAME == '{table_name}'"
+                f'TABLE_NAME == "{table_name}"'
             )
 
             target_unixtime = 0
