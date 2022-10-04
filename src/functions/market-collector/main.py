@@ -40,7 +40,7 @@ def request_crypto_collector():
 
     if response.status_code != 200:
         error_msg = f"crypto-collector Error \
-            [HTTP STATUS: {response.status_code}], [RESULT: {response.text}]"
+            [HTTP STATUS: {response.status_code}], [RESULT: {response.reason}]"
         raise Exception(error_msg)
 
 

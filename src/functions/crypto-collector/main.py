@@ -54,6 +54,14 @@ columns = ["UNIX_TIME"] + float_columns
 
 
 def handler(request):
+    try:
+        crypto_collector()
+    except Exception as e:
+        publish_error_report(e)
+        raise e
+
+
+def crypto_collector():
     bigquery_client = BqClient(project_id)
 
     # 最新unixTimeを取得する
@@ -65,14 +73,14 @@ def handler(request):
     for exchange in exchanges:
         for period in periods:
 
-            table_name = f"{exchange['ticker']}_{period['name']}'"
+            table_name = f"{exchange['ticker']}_{period['name']}"
 
             df_target_unixtime = df_unixtime.query(
                 f'TABLE_NAME == "{table_name}"'
             )
 
             target_unixtime = 0
-            if len(df_target_unixtime) == 1:
+            if not df_target_unixtime.empty:
                 target_unixtime = df_target_unixtime["UNIX_TIME"].values[0]
 
             response_data = request_crypto_watch_api(
