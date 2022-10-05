@@ -60,6 +60,8 @@ def handler(request):
         publish_error_report(e)
         raise e
 
+    return "ok"
+
 
 def crypto_collector():
     bigquery_client = BqClient(project_id)
@@ -137,8 +139,6 @@ def crypto_collector():
 
     # unixtime重複削除
     update_recently_unixtime(bigquery_client, df_unixtime)
-
-    return "ok"
 
 
 def load_recently_unixtime(client: BqClient):
