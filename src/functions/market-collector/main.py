@@ -10,6 +10,8 @@ from google.auth.transport.requests import Request
 project_id = os.getenv("GCP_PROJECT_ID")
 # crypto-collectorのエンドポイント
 crypto_collector_endpoint = os.getenv("CRYPTO_COLLECTOR_ENDPOINT")
+# stock-collectorのエンドポイント
+stock_collector_endpoint = os.getenv("STOCK_COLLECTOR_ENDPOINT")
 
 
 def handler(event, context):
@@ -30,6 +32,8 @@ def market_collector():
 
     # 暗号資産データを収集するAPIを実行する
     request_crypto_collector()
+    # 株データを収集するAPIを実行する
+    request_stock_collector()
 
 
 def request_crypto_collector():
@@ -40,6 +44,18 @@ def request_crypto_collector():
 
     if response.status_code != 200:
         error_msg = f"crypto-collector Error \
+            [HTTP STATUS: {response.status_code}], [RESULT: {response.reason}]"
+        raise Exception(error_msg)
+
+
+def request_stock_collector():
+    """
+    株データ収集APIを実行する
+    """
+    response = request_google_functions(stock_collector_endpoint)
+
+    if response.status_code != 200:
+        error_msg = f"stock-collector Error \
             [HTTP STATUS: {response.status_code}], [RESULT: {response.reason}]"
         raise Exception(error_msg)
 
@@ -66,7 +82,7 @@ def publish_error_report(error: str):
 
     publisher.publish(
         topic_name,
-        data=error.encode("utf-8"),
+        data=error,
         projectId=project_id,
         functionName="market-collector",
         eventTime=str(int(time.time()))

@@ -227,7 +227,7 @@ def publish_error_report(error: str):
 
     publisher.publish(
         topic_name,
-        data=error.encode("utf-8"),
+        data=error,
         projectId=project_id,
         functionName="crypto-collector",
         eventTime=str(int(time.time()))

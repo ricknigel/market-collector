@@ -102,10 +102,12 @@ def stock_collector():
 
             if df_target_unixtime.empty:
                 # unixtimeデータフレームが空の場合、追加する
-                df_unixtime = pd.concat([
-                        df_unixtime,
-                        {"TABLE_NAME": table_name, "UNIX_TIME": max_unixtime}
-                    ],
+                df_add = pd.DataFrame({
+                    "TABLE_NAME": [table_name],
+                    "UNIX_TIME": [max_unixtime]
+                })
+                df_unixtime = pd.concat(
+                    [df_unixtime, df_add],
                     ignore_index=True
                 )
             else:
@@ -240,8 +242,8 @@ def publish_error_report(error: str):
 
     publisher.publish(
         topic_name,
-        data=error.encode("utf-8"),
+        data=error,
         projectId=project_id,
-        functionName="crypto-collector",
+        functionName="stock-collector",
         eventTime=str(int(time.time()))
     )

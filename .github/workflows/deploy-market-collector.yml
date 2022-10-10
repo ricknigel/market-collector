@@ -38,6 +38,7 @@ jobs:
           env_vars: >-
             GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }},
             CRYPTO_COLLECTOR_ENDPOINT=${{ secrets.CRYPTO_COLLECTOR_ENDPOINT }},
+            STOCK_COLLECTOR_ENDPOINT=${{ secrets.STOCK_COLLECTOR_ENDPOINT }},
             ERROR_REPORT_TOPIC=${{ secrets.ERROR_REPORT_TOPIC }}
           source_dir: src/functions/market-collector
           timeout: 300
