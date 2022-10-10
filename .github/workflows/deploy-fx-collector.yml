@@ -1,4 +1,4 @@
-\name: Deploy function 'fx-collector' To Google Cloud Functions
+name: Deploy function 'fx-collector' To Google Cloud Functions
 
 on:
   push:
