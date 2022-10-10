@@ -12,6 +12,8 @@ project_id = os.getenv("GCP_PROJECT_ID")
 crypto_collector_endpoint = os.getenv("CRYPTO_COLLECTOR_ENDPOINT")
 # stock-collectorのエンドポイント
 stock_collector_endpoint = os.getenv("STOCK_COLLECTOR_ENDPOINT")
+# fx-collectorのエンドポイント
+fx_collector_endpoint = os.getenv("FX_COLLECTOR_ENDPOINT")
 
 
 def handler(event, context):
@@ -34,6 +36,8 @@ def market_collector():
     request_crypto_collector()
     # 株データを収集するAPIを実行する
     request_stock_collector()
+    # 為替通貨データを収集するAPIを実行する
+    request_fx_collector()
 
 
 def request_crypto_collector():
@@ -56,6 +60,18 @@ def request_stock_collector():
 
     if response.status_code != 200:
         error_msg = f"stock-collector Error \
+            [HTTP STATUS: {response.status_code}], [RESULT: {response.reason}]"
+        raise Exception(error_msg)
+
+
+def request_fx_collector():
+    """
+    為替通貨データ収集APIを実行する
+    """
+    response = request_google_functions(fx_collector_endpoint)
+
+    if response.status_code != 200:
+        error_msg = f"fx-collector Error \
             [HTTP STATUS: {response.status_code}], [RESULT: {response.reason}]"
         raise Exception(error_msg)
 

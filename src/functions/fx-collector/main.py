@@ -8,7 +8,6 @@ from google.cloud.storage import Client as StorageClient
 from google.cloud.pubsub import PublisherClient
 import yfinance as yf
 
-
 # GCPのプロジェクトID
 project_id = os.getenv("GCP_PROJECT_ID")
 # BigQueryのデータセット名
@@ -18,16 +17,18 @@ bucket_name = os.getenv("MARKET_DATA_BUCKET")
 # 最新unixtime管理テーブル名
 recently_unixtime_table = os.getenv("BIGQUERY_UNIXTIME_TABLE")
 
-stocks = [
-    {"ticker": "^DJI"},
-    {"ticker": "^NDX"},
-    {"ticker": "^GSPC"},
-    {"ticker": "^N225"},
-    {"ticker": "^HSI"},
-    {"ticker": "000001.SS"},
-    {"ticker": "^BSESN"},
-    {"ticker": "^STOXX50E"},
-    {"ticker": "^FTSE"},
+fxs = [
+    {"ticker": "EUR=X", "name": "USDEUR"},
+    {"ticker": "JPY=X", "name": "USDJPY"},
+    {"ticker": "GBP=X", "name": "USDGBP"},
+    {"ticker": "CHF=X", "name": "USDCHF"},
+    {"ticker": "AUD=X", "name": "USDAUD"},
+    {"ticker": "CAD=X", "name": "USDCAD"},
+    {"ticker": "HKD=X", "name": "USDHKD"},
+    {"ticker": "KRW=X", "name": "USDKRW"},
+    {"ticker": "EURJPY=X", "name": "EURJPY"},
+    {"ticker": "EURGBP=X", "name": "EURGBP"},
+    {"ticker": "EURCHF=X", "name": "EURCHF"},
 ]
 
 periods = [
@@ -47,7 +48,7 @@ columns = ["UNIX_TIME"] + float_columns
 
 def handler(request):
     try:
-        stock_collector()
+        fx_collector()
     except Exception as e:
         publish_error_report(e)
         raise e
@@ -55,7 +56,7 @@ def handler(request):
     return "ok"
 
 
-def stock_collector():
+def fx_collector():
     bigquery_client = BqClient(project_id)
 
     # 最新unixTimeを取得する
@@ -64,12 +65,10 @@ def stock_collector():
     now = datetime.now(ZoneInfo("Asia/Tokyo"))
     execTime = now.strftime("%Y%m%d_%Hh")
 
-    for stock in stocks:
+    for fx in fxs:
         for period in periods:
 
-            table_ticker = stock['ticker'].replace('^', '').replace('.', '')
-
-            table_name = f"{table_ticker}_{period['name']}"
+            table_name = f"{fx['name']}_{period['name']}"
 
             df_target_unixtime = df_unixtime.query(
                 f'TABLE_NAME == "{table_name}"'
@@ -81,7 +80,7 @@ def stock_collector():
 
             # yfinanceよりデータを取得する
             response = request_yfinance(
-                stock["ticker"], period["time"], target_unixtime
+                fx["ticker"], period["time"], target_unixtime
             )
             # 整理・正規化
             df = cleansing_df(response, target_unixtime)
@@ -91,7 +90,7 @@ def stock_collector():
 
             # データをcsv形式でgcsへアップロードする
             upload_df_to_gcs(
-                table_ticker,
+                fx['name'],
                 execTime,
                 period["name"],
                 df
@@ -118,16 +117,6 @@ def stock_collector():
 
     # unixtime重複削除
     update_recently_unixtime(bigquery_client, df_unixtime)
-
-
-def load_recently_unixtime(client: BqClient):
-
-    table_name = f"{project_id}.{dataset}.{recently_unixtime_table}"
-    query = f"SELECT TABLE_NAME, UNIX_TIME FROM `{table_name}`;"
-
-    unixtime_df = client.query(query).to_dataframe()
-
-    return unixtime_df
 
 
 def request_yfinance(ticker, interval, unixtime):
@@ -199,6 +188,16 @@ def upload_df_to_gcs(ticker, execTime, period, df):
     )
 
 
+def load_recently_unixtime(client: BqClient):
+
+    table_name = f"{project_id}.{dataset}.{recently_unixtime_table}"
+    query = f"SELECT TABLE_NAME, UNIX_TIME FROM `{table_name}`;"
+
+    unixtime_df = client.query(query).to_dataframe()
+
+    return unixtime_df
+
+
 def update_recently_unixtime(client: BqClient, df_unixtime):
     """
     最新UnixTime管理テーブルのunixtimeを更新する
@@ -247,6 +246,6 @@ def publish_error_report(error: str):
         topic_name,
         data=error,
         projectId=project_id,
-        functionName="stock-collector",
+        functionName="fx-collector",
         eventTime=str(int(time.time()))
     )
