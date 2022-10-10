@@ -6,6 +6,7 @@ import pandas as pd
 from google.cloud.bigquery import Client as BqClient, QueryJobConfig
 from google.cloud.storage import Client as StorageClient
 from google.cloud.pubsub import PublisherClient
+import yfinance as yf
 
 
 # GCPのプロジェクトID
@@ -18,30 +19,29 @@ bucket_name = os.getenv("MARKET_DATA_BUCKET")
 recently_unixtime_table = os.getenv("BIGQUERY_UNIXTIME_TABLE")
 
 stocks = [
-    {"symbol": "ダウ工業株30種"},
-    {"symbol": "NASDAQ100"},
-    {"symbol": "S&P500"},
-    {"symbol": "日経225"},
-    {"symbol": "香港ハンセン指数"},
-    {"symbol": "上海総合"},
-    {"symbol": "インドSENSEX"},
-    {"symbol": "ユーロストック50指数"},
-    {"symbol": "FTSE100指数"},
+    {"ticker": "^DJI"},
+    {"ticker": "^NDX"},
+    {"ticker": "^GSPC"},
+    {"ticker": "^N225"},
+    {"ticker": "^HSI"},
+    {"ticker": "000001.SS"},
+    {"ticker": "^BSESN"},
+    {"ticker": "^STOXX50E"},
+    {"ticker": "^FTSE"},
 ]
 
 periods = [
-    {"name": "1D", "time": "1day"}
+    {"name": "1M", "time": "1m"},
+    {"name": "1D", "time": "1d"}
 ]
 
-float_columns = [
-    "OPEN_PRICE",
-    "HIGH_PRICE",
-    "LOW_PRICE",
-    "CLOSE_PRICE",
-    "VOLUME",
-    "QUOTE_VOLUME"
-]
-
+OPEN = "OPEN_PRICE"
+HIGH = "HIGH_PRICE"
+LOW = "LOW_PRICE"
+CLOSE = "CLOSE_PRICE"
+VOLUME = "VOLUME"
+QUOTE_VOLUME = "QUOTE_VOLUME"
+float_columns = [OPEN, HIGH, LOW, CLOSE, VOLUME, QUOTE_VOLUME]
 columns = ["UNIX_TIME"] + float_columns
 
 
@@ -67,7 +67,9 @@ def stock_collector():
     for stock in stocks:
         for period in periods:
 
-            table_name = f"{stock['symbol']}_{period['name']}"
+            table_ticker = stock['ticker'].replace('^', '').replace('.', '')
+
+            table_name = f"{table_ticker}_{period['name']}"
 
             df_target_unixtime = df_unixtime.query(
                 f'TABLE_NAME == "{table_name}"'
@@ -77,9 +79,43 @@ def stock_collector():
             if not df_target_unixtime.empty:
                 target_unixtime = df_target_unixtime["UNIX_TIME"].values[0]
 
-            # response_data = request_investpy(
-            #     stock["symbol"], period["time"], target_unixtime
-            # )
+            # yfinanceよりデータを取得する
+            response = request_yfinance(
+                stock["ticker"], period["time"], target_unixtime
+            )
+            # 整理・正規化
+            df = cleansing_df(response, target_unixtime)
+
+            if df.empty:
+                continue
+
+            # データをcsv形式でgcsへアップロードする
+            upload_df_to_gcs(
+                table_ticker,
+                execTime,
+                period["name"],
+                df
+            )
+
+            # yfinance取得データから最新のunixtimeを取得する
+            max_unixtime = df["UNIX_TIME"].max()
+
+            if df_target_unixtime.empty:
+                # unixtimeデータフレームが空の場合、追加する
+                df_unixtime = pd.concat([
+                        df_unixtime,
+                        {"TABLE_NAME": table_name, "UNIX_TIME": max_unixtime}
+                    ],
+                    ignore_index=True
+                )
+            else:
+                # unixtimeデータフレームが空ではない場合、該当するunixtimeを更新する
+                df_unixtime.loc[
+                    df_unixtime["TABLE_NAME"] == table_name, "UNIX_TIME"
+                ] = max_unixtime
+
+    # unixtime重複削除
+    update_recently_unixtime(bigquery_client, df_unixtime)
 
 
 def load_recently_unixtime(client: BqClient):
@@ -90,6 +126,108 @@ def load_recently_unixtime(client: BqClient):
     unixtime_df = client.query(query).to_dataframe()
 
     return unixtime_df
+
+
+def request_yfinance(ticker, interval, unixtime):
+
+    period = "max" if unixtime == 0 else "5d"
+    response = yf.download(
+        tickers=ticker,
+        interval=interval,
+        period=period,
+        auto_adjust=True
+    )
+    return response
+
+
+def cleansing_df(df: pd.DataFrame, target_unixtime):
+    # レスポンスデータの長さが2未満の場合、データが無いかもしくは、未来のデータしかないため、処理を中断する
+    if len(df) < 2:
+        return pd.DataFrame()
+
+    # datetimeindexを使って日付の昇順にソート
+    df = df.sort_index(ascending=True)
+
+    # レスポンスデータの末尾には未来日の価格に実行時点の最新値が入るが、この値は実行日時によって変化してしまうため、不確実のデータとなる。
+    # よって未来日の項目となる配列の末尾を削除する。
+    df = df[:-1]
+
+    # datetimeindexをCLOSE_TIMEカラムへ移動する
+    index_name = df.index.name
+    df.reset_index(inplace=True)
+    df = df.rename(columns={index_name: "CLOSE_TIME"})
+
+    # CLOSE_TIMEからunixtimeを生成する
+    df["UNIX_TIME"] = df["CLOSE_TIME"].apply(lambda x: int(x.timestamp()))
+    # CLOSE_TIMEをUTCに変換する
+    df["CLOSE_TIME"] = pd.to_datetime(df["UNIX_TIME"], unit="s", utc=True)
+    # 列名を変換する
+    df = df.rename(columns={
+        "Open": OPEN,
+        "High": HIGH,
+        "Low": LOW,
+        "Close": CLOSE,
+        "Volume": VOLUME
+    })
+    # QUOTE_VOLUMEカラムを設定する
+    df[QUOTE_VOLUME] = 0
+    # int → floatへ変換(cryptowatchから小数点無しで来る場合がある)
+    df[float_columns] = df[float_columns].astype("float")
+
+    # unixtimeより上のデータを抽出する
+    if target_unixtime != 0:
+        df = df.query(f'UNIX_TIME > {target_unixtime}')
+
+    return df
+
+
+def upload_df_to_gcs(ticker, execTime, period, df):
+    """
+    yfinanceデータ（データフレーム）をcsv形式でGCSへアップロードする
+    """
+    client = StorageClient(project_id)
+    bucket = client.get_bucket(bucket_name)
+
+    gcs_path = f"{dataset}/{ticker}/{execTime}/{period}.csv"
+
+    blob = bucket.blob(gcs_path)
+    blob.upload_from_string(
+        df.to_csv(index=False, header=True, sep=","),
+        content_type="text/csv"
+    )
+
+
+def update_recently_unixtime(client: BqClient, df_unixtime):
+    """
+    最新UnixTime管理テーブルのunixtimeを更新する
+    """
+    table_id = f"{project_id}.{dataset}.{recently_unixtime_table}"
+
+    # unixtimeデータフレームをunixtime管理テーブルへinsert
+    client.insert_rows_from_dataframe(client.get_table(table_id), df_unixtime)
+
+    # unixtime管理テーブルでTABLE_NAMEカラムが重複してるデータを削除
+    duplicate_query = f"""
+        SELECT
+            * EXCEPT(rowNumber)
+        FROM (
+            SELECT
+                *,
+                ROW_NUMBER() OVER (
+                    PARTITION BY TABLE_NAME ORDER BY UNIX_TIME DESC
+                ) as rowNumber
+            FROM
+                {table_id}
+        )
+        WHERE
+            rowNumber = 1;
+    """
+
+    job_config = QueryJobConfig()
+    job_config.destination = table_id
+    job_config.write_disposition = "WRITE_TRUNCATE"
+    job = client.query(duplicate_query, job_config=job_config)
+    job.result()
 
 
 def publish_error_report(error: str):
