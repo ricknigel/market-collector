@@ -14,6 +14,8 @@ crypto_collector_endpoint = os.getenv("CRYPTO_COLLECTOR_ENDPOINT")
 stock_collector_endpoint = os.getenv("STOCK_COLLECTOR_ENDPOINT")
 # fx-collectorのエンドポイント
 fx_collector_endpoint = os.getenv("FX_COLLECTOR_ENDPOINT")
+# commodity-collectorのエンドポイント
+commodity_collector_endpoint = os.getenv("COMMODITY_COLLECTOR_ENDPOINT")
 
 
 def handler(event, context):
@@ -38,6 +40,8 @@ def market_collector():
     request_stock_collector()
     # 為替通貨データを収集するAPIを実行する
     request_fx_collector()
+    # コモディデータを収集するAPIを実行する
+    request_commodity_collector()
 
 
 def request_crypto_collector():
@@ -72,6 +76,18 @@ def request_fx_collector():
 
     if response.status_code != 200:
         error_msg = f"fx-collector Error \
+            [HTTP STATUS: {response.status_code}], [RESULT: {response.reason}]"
+        raise Exception(error_msg)
+
+
+def request_commodity_collector():
+    """
+    コモディティデータ収集APIを実行する
+    """
+    response = request_google_functions(commodity_collector_endpoint)
+
+    if response.status_code != 200:
+        error_msg = f"commodity-collector Error \
             [HTTP STATUS: {response.status_code}], [RESULT: {response.reason}]"
         raise Exception(error_msg)
 
