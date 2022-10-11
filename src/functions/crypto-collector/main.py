@@ -57,7 +57,7 @@ def handler(request):
     try:
         crypto_collector()
     except Exception as e:
-        publish_error_report(e)
+        publish_error_report(str(e))
         raise e
 
     return "ok"
@@ -144,7 +144,15 @@ def crypto_collector():
 def load_recently_unixtime(client: BqClient):
 
     table_name = f"{project_id}.{dataset}.{recently_unixtime_table}"
-    query = f"SELECT TABLE_NAME, UNIX_TIME FROM `{table_name}`;"
+    query = f"""
+        SELECT
+            TABLE_NAME,
+            UNIX_TIME
+        FROM
+            `{table_name}`
+        ORDER BY
+            UNIX_TIME DESC;
+    """
 
     unixtime_df = client.query(query).to_dataframe()
 
@@ -194,27 +202,27 @@ def update_recently_unixtime(client: BqClient, df_unixtime):
     client.insert_rows_from_dataframe(client.get_table(table_id), df_unixtime)
 
     # unixtime管理テーブルでTABLE_NAMEカラムが重複してるデータを削除
-    duplicate_query = f"""
-        SELECT
-            * EXCEPT(rowNumber)
-        FROM (
-            SELECT
-                *,
-                ROW_NUMBER() OVER (
-                    PARTITION BY TABLE_NAME ORDER BY UNIX_TIME DESC
-                ) as rowNumber
-            FROM
-                {table_id}
-        )
-        WHERE
-            rowNumber = 1;
-    """
+    # duplicate_query = f"""
+    #     SELECT
+    #         * EXCEPT(rowNumber)
+    #     FROM (
+    #         SELECT
+    #             *,
+    #             ROW_NUMBER() OVER (
+    #                 PARTITION BY TABLE_NAME ORDER BY UNIX_TIME DESC
+    #             ) as rowNumber
+    #         FROM
+    #             {table_id}
+    #     )
+    #     WHERE
+    #         rowNumber = 1;
+    # """
 
-    job_config = QueryJobConfig()
-    job_config.destination = table_id
-    job_config.write_disposition = "WRITE_TRUNCATE"
-    job = client.query(duplicate_query, job_config=job_config)
-    job.result()
+    # job_config = QueryJobConfig()
+    # job_config.destination = table_id
+    # job_config.write_disposition = "WRITE_TRUNCATE"
+    # job = client.query(duplicate_query, job_config=job_config)
+    # job.result()
 
 
 def publish_error_report(error: str):
@@ -227,7 +235,7 @@ def publish_error_report(error: str):
 
     publisher.publish(
         topic_name,
-        data=error,
+        data=error.encode("utf-8"),
         projectId=project_id,
         functionName="crypto-collector",
         eventTime=str(int(time.time()))
