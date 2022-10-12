@@ -1,7 +1,7 @@
 import asyncio
 import os
 import time
-import requests
+import aiohttp
 from google.cloud.pubsub import PublisherClient
 from google.oauth2.id_token import fetch_id_token
 from google.auth.transport.requests import Request
@@ -35,12 +35,13 @@ def handler(event, context):
         raise e
 
 
-def market_collector():
+async def market_collector():
     """
     金融データを収集する
     """
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
     # 以下のデータを収集するAPIを実行する
     # ・暗号資産データ
@@ -48,10 +49,10 @@ def market_collector():
     # ・為替通貨データ
     # ・コモディデータ
     tasks = asyncio.gather(
-        request_crypto_collector(loop),
-        request_stock_collector(loop),
-        request_fx_collector(loop),
-        request_commodity_collector(loop),
+        request_crypto_collector(),
+        request_stock_collector(),
+        request_fx_collector(),
+        request_commodity_collector(),
         return_exceptions=True
     )
     results = loop.run_until_complete(tasks)
@@ -61,55 +62,35 @@ def market_collector():
     duplicate_unixtime()
 
 
-def request_crypto_collector(loop):
+async def request_crypto_collector():
     """
     暗号資産データ収集APIを実行する
     """
-    response = request_google_functions(loop, crypto_collector_endpoint)
-
-    if response.status_code != 200:
-        error_msg = f"crypto-collector Error \
-            [HTTP STATUS: {response.status_code}], [RESULT: {response.reason}]"
-        raise Exception(error_msg)
+    await request_google_functions(crypto_collector_endpoint)
 
 
-def request_stock_collector(loop):
+async def request_stock_collector():
     """
     株データ収集APIを実行する
     """
-    response = request_google_functions(loop, stock_collector_endpoint)
-
-    if response.status_code != 200:
-        error_msg = f"stock-collector Error \
-            [HTTP STATUS: {response.status_code}], [RESULT: {response.reason}]"
-        raise Exception(error_msg)
+    await request_google_functions(stock_collector_endpoint)
 
 
-def request_fx_collector(loop):
+async def request_fx_collector():
     """
     為替通貨データ収集APIを実行する
     """
-    response = request_google_functions(loop, fx_collector_endpoint)
-
-    if response.status_code != 200:
-        error_msg = f"fx-collector Error \
-            [HTTP STATUS: {response.status_code}], [RESULT: {response.reason}]"
-        raise Exception(error_msg)
+    await request_google_functions(fx_collector_endpoint)
 
 
-def request_commodity_collector(loop):
+async def request_commodity_collector():
     """
     コモディティデータ収集APIを実行する
     """
-    response = request_google_functions(loop, commodity_collector_endpoint)
-
-    if response.status_code != 200:
-        error_msg = f"commodity-collector Error \
-            [HTTP STATUS: {response.status_code}], [RESULT: {response.reason}]"
-        raise Exception(error_msg)
+    await request_google_functions(commodity_collector_endpoint)
 
 
-async def request_google_functions(loop: asyncio.AbstractEventLoop, url):
+async def request_google_functions(url: str):
     """
     Google Cloud Functionsの関数をHTTPリクエストする
     """
@@ -118,8 +99,14 @@ async def request_google_functions(loop: asyncio.AbstractEventLoop, url):
     headers = {
         "Authorization": f"Bearer {id_token}"
     }
-    return await loop.run_in_executor(
-        None, requests.post, url, headers=headers)
+    async with aiohttp.ClientSession(headers=headers) as session:
+        async with session.post(url) as response:
+            if response.status != 200:
+                function_name = url.split("/")[:-1]
+                error_msg = f"{function_name} Error \
+                    [HTTP STATUS: {response.status}], \
+                        [RESULT: {response.reason}]"
+                raise Exception(error_msg)
 
 
 def duplicate_unixtime():

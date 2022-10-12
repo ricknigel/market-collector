@@ -3,4 +3,4 @@
 google-cloud-bigquery==2.34.4
 google-cloud-pubsub
 google-auth
-requests
+aiohttp
