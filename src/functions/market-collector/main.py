@@ -48,10 +48,11 @@ def market_collector():
     # ・為替通貨データ
     # ・コモディデータ
     tasks = asyncio.gather(
-        request_crypto_collector(),
-        request_stock_collector(),
-        request_fx_collector(),
-        request_commodity_collector()
+        request_crypto_collector(loop),
+        request_stock_collector(loop),
+        request_fx_collector(loop),
+        request_commodity_collector(loop),
+        return_exceptions=True
     )
     results = loop.run_until_complete(tasks)
     print(results)
@@ -60,11 +61,11 @@ def market_collector():
     duplicate_unixtime()
 
 
-def request_crypto_collector():
+def request_crypto_collector(loop):
     """
     暗号資産データ収集APIを実行する
     """
-    response = request_google_functions(crypto_collector_endpoint)
+    response = request_google_functions(loop, crypto_collector_endpoint)
 
     if response.status_code != 200:
         error_msg = f"crypto-collector Error \
@@ -72,11 +73,11 @@ def request_crypto_collector():
         raise Exception(error_msg)
 
 
-def request_stock_collector():
+def request_stock_collector(loop):
     """
     株データ収集APIを実行する
     """
-    response = request_google_functions(stock_collector_endpoint)
+    response = request_google_functions(loop, stock_collector_endpoint)
 
     if response.status_code != 200:
         error_msg = f"stock-collector Error \
@@ -84,11 +85,11 @@ def request_stock_collector():
         raise Exception(error_msg)
 
 
-def request_fx_collector():
+def request_fx_collector(loop):
     """
     為替通貨データ収集APIを実行する
     """
-    response = request_google_functions(fx_collector_endpoint)
+    response = request_google_functions(loop, fx_collector_endpoint)
 
     if response.status_code != 200:
         error_msg = f"fx-collector Error \
@@ -96,11 +97,11 @@ def request_fx_collector():
         raise Exception(error_msg)
 
 
-def request_commodity_collector():
+def request_commodity_collector(loop):
     """
     コモディティデータ収集APIを実行する
     """
-    response = request_google_functions(commodity_collector_endpoint)
+    response = request_google_functions(loop, commodity_collector_endpoint)
 
     if response.status_code != 200:
         error_msg = f"commodity-collector Error \
@@ -108,11 +109,10 @@ def request_commodity_collector():
         raise Exception(error_msg)
 
 
-async def request_google_functions(url):
+async def request_google_functions(loop: asyncio.AbstractEventLoop, url):
     """
     Google Cloud Functionsの関数をHTTPリクエストする
     """
-    loop = asyncio.get_event_loop()
     auth_req = Request()
     id_token = fetch_id_token(auth_req, url)
     headers = {
