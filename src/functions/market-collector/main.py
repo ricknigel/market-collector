@@ -35,7 +35,7 @@ def handler(event, context):
         raise e
 
 
-async def market_collector():
+def market_collector():
     """
     金融データを収集する
     """
@@ -49,10 +49,12 @@ async def market_collector():
     # ・為替通貨データ
     # ・コモディデータ
     tasks = asyncio.gather(
-        request_crypto_collector(),
-        request_stock_collector(),
-        request_fx_collector(),
-        request_commodity_collector(),
+        [
+            request_crypto_collector(),
+            request_stock_collector(),
+            request_fx_collector(),
+            request_commodity_collector()
+        ],
         return_exceptions=True
     )
     results = loop.run_until_complete(tasks)
