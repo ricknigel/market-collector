@@ -4,7 +4,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import pandas as pd
 import requests
-from google.cloud.bigquery import Client as BqClient, QueryJobConfig
+from google.cloud.bigquery import Client as BqClient
 from google.cloud.storage import Client as StorageClient
 from google.cloud.pubsub import PublisherClient
 
@@ -200,29 +200,6 @@ def update_recently_unixtime(client: BqClient, df_unixtime):
 
     # unixtimeデータフレームをunixtime管理テーブルへinsert
     client.insert_rows_from_dataframe(client.get_table(table_id), df_unixtime)
-
-    # unixtime管理テーブルでTABLE_NAMEカラムが重複してるデータを削除
-    # duplicate_query = f"""
-    #     SELECT
-    #         * EXCEPT(rowNumber)
-    #     FROM (
-    #         SELECT
-    #             *,
-    #             ROW_NUMBER() OVER (
-    #                 PARTITION BY TABLE_NAME ORDER BY UNIX_TIME DESC
-    #             ) as rowNumber
-    #         FROM
-    #             {table_id}
-    #     )
-    #     WHERE
-    #         rowNumber = 1;
-    # """
-
-    # job_config = QueryJobConfig()
-    # job_config.destination = table_id
-    # job_config.write_disposition = "WRITE_TRUNCATE"
-    # job = client.query(duplicate_query, job_config=job_config)
-    # job.result()
 
 
 def publish_error_report(error: str):

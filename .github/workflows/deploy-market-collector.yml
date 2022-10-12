@@ -37,6 +37,8 @@ jobs:
           region: ${{ secrets.GCP_REGION }}
           env_vars: >-
             GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }},
+            BIGQUERY_DATASET=${{ secrets.BIGQUERY_DATASET }},
+            BIGQUERY_UNIXTIME_TABLE=${{ secrets.BIGQUERY_UNIXTIME_TABLE }},
             CRYPTO_COLLECTOR_ENDPOINT=${{ secrets.CRYPTO_COLLECTOR_ENDPOINT }},
             STOCK_COLLECTOR_ENDPOINT=${{ secrets.STOCK_COLLECTOR_ENDPOINT }},
             FX_COLLECTOR_ENDPOINT=${{ secrets.FX_COLLECTOR_ENDPOINT }},
