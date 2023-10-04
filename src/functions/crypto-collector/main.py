@@ -17,28 +17,39 @@ dataset = os.getenv("BIGQUERY_DATASET")
 bucket_name = os.getenv("MARKET_DATA_BUCKET")
 # 最新unixtime管理テーブル名
 recently_unixtime_table = os.getenv("BIGQUERY_UNIXTIME_TABLE")
-# cryptowatchAPIのurl（暗号資産データ取得先API）
-crypto_watch_url = "https://api.cryptowat.ch/markets/{exchange}/{ticker}/ohlc"
+# 暗号資産データ取得先API(kraken API)
+crypto_api_url = "https://api.kraken.com/0/public/OHLC"
 
-exchanges = [
-    {"exchange": "coinbase-pro", "ticker": "BTCUSD"},
-    {"exchange": "coinbase-pro", "ticker": "ETHBTC"}
+tickers = [
+    {"table": "BTCUSD", "ticker": "XBTUSD", "res_ticker": "XXBTZUSD"},
+    {"table": "ETHBTC", "ticker": "ETHBTC", "res_ticker": "XETHXXBT"}
 ]
 
 periods = [
-    {"name": "1M", "time": "60"},
-    {"name": "3M", "time": "180"},
-    {"name": "5M", "time": "300"},
-    {"name": "15M", "time": "900"},
-    {"name": "30M", "time": "1800"},
-    {"name": "1H", "time": "3600"},
-    {"name": "2H", "time": "7200"},
-    {"name": "4H", "time": "14400"},
-    {"name": "6H", "time": "21600"},
-    {"name": "12H", "time": "43200"},
-    {"name": "1D", "time": "86400"},
-    {"name": "3D", "time": "259200"},
-    {"name": "1W", "time": "604800"}
+    {"name": "1M", "time": "1"},
+    # {"name": "3M", "time": "180"},
+    {"name": "5M", "time": "5"},
+    {"name": "15M", "time": "15"},
+    {"name": "30M", "time": "30"},
+    {"name": "1H", "time": "60"},
+    # {"name": "2H", "time": "7200"},
+    {"name": "4H", "time": "240"},
+    # {"name": "6H", "time": "21600"},
+    # {"name": "12H", "time": "43200"},
+    {"name": "1D", "time": "1440"},
+    # {"name": "3D", "time": "259200"},
+    {"name": "1W", "time": "10080"}
+]
+
+api_columns = [
+    "UNIX_TIME",
+    "OPEN_PRICE",
+    "HIGH_PRICE",
+    "LOW_PRICE",
+    "CLOSE_PRICE",
+    "VWAP",
+    "VOLUME",
+    "COUNT"
 ]
 
 float_columns = [
@@ -47,10 +58,7 @@ float_columns = [
     "LOW_PRICE",
     "CLOSE_PRICE",
     "VOLUME",
-    "QUOTE_VOLUME"
 ]
-
-columns = ["UNIX_TIME"] + float_columns
 
 
 def handler(request):
@@ -72,10 +80,10 @@ def crypto_collector():
     now = datetime.now(ZoneInfo("Asia/Tokyo"))
     execTime = now.strftime("%Y%m%d_%Hh")
 
-    for exchange in exchanges:
+    for ticker in tickers:
         for period in periods:
 
-            table_name = f"{exchange['ticker']}_{period['name']}"
+            table_name = f"{ticker['table']}_{period['name']}"
 
             df_target_unixtime = df_unixtime.query(
                 f'TABLE_NAME == "{table_name}"'
@@ -86,8 +94,8 @@ def crypto_collector():
                 target_unixtime = df_target_unixtime["UNIX_TIME"].values[0]
 
             response_data = request_crypto_watch_api(
-                exchange["exchange"],
-                exchange["ticker"],
+                ticker["res_ticker"],
+                ticker["ticker"],
                 period["time"],
                 target_unixtime
             )
@@ -101,7 +109,13 @@ def crypto_collector():
             response_data = response_data[:-1]
 
             # api取得分のデータ(list in list)をDataFrameに変換
-            df_api = pd.DataFrame(response_data, columns=columns)
+            df_api = pd.DataFrame(response_data, columns=api_columns)
+
+            # 不要カラム削除
+            df_api = df_api.drop(columns=['VWAP', 'COUNT'])
+
+            # カラム追加
+            df_api['QUOTE_VOLUME'] = 0
 
             # int → floatへ変換(cryptowatchから小数点無しで来る場合がある)
             df_api[float_columns] = df_api[float_columns].astype("float")
@@ -114,7 +128,7 @@ def crypto_collector():
 
             # api取得分のdfをcsv形式でgcsへアップロードする
             upload_df_to_gcs(
-                exchange["ticker"],
+                ticker["table"],
                 execTime,
                 period["name"],
                 df_api
@@ -159,21 +173,17 @@ def load_recently_unixtime(client: BqClient):
     return unixtime_df
 
 
-def request_crypto_watch_api(exchange, ticker, period, unixtime):
+def request_crypto_watch_api(res_ticker, ticker, period, unixtime):
     """
-    暗号資産データを取得するためにcryptowatchAPIへリクエストする
+    暗号資産データを取得するためにkraken APIへリクエストする
     """
-    endpoint = crypto_watch_url.format(
-        exchange=exchange,
-        ticker=ticker
-    )
 
     # unixtimeに1を加えた値を設定することで、前回取得分以降のデータを取得する
-    params = {"periods": period, "after": unixtime + 1}
+    params = {"pair": ticker, "interval": period, "since": unixtime + 1}
 
-    response = requests.get(endpoint, params=params).json()
+    response = requests.get(crypto_api_url, params=params).json()
 
-    return response["result"][period]
+    return response["result"][res_ticker]
 
 
 def upload_df_to_gcs(ticker, execTime, period, df_api):
