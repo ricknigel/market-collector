@@ -58,6 +58,7 @@ float_columns = [
     "LOW_PRICE",
     "CLOSE_PRICE",
     "VOLUME",
+    "QUOTE_VOLUME"
 ]
 
 
