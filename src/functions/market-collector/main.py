@@ -43,8 +43,7 @@ def market_collector():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    results = loop.run_until_complete(request_tasks())
-    print(results)
+    loop.run_until_complete(request_tasks())
 
     # unixtime管理テーブルの重複データを削除する
     duplicate_unixtime()
@@ -58,7 +57,7 @@ async def request_tasks():
     # ・コモディデータ
     request_list = [
         request_crypto_collector(),
-        request_stock_collector(),
+        # request_stock_collector(),
         request_fx_collector(),
         request_commodity_collector()
     ]
