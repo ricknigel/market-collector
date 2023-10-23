@@ -58,7 +58,7 @@ async def request_tasks():
     request_list = [
         request_crypto_collector(),
         # request_stock_collector(),
-        request_fx_collector(),
+        # request_fx_collector(),
         request_commodity_collector()
     ]
     await asyncio.gather(*request_list, return_exceptions=True)
